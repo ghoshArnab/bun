@@ -1476,7 +1476,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
             result.ensureStillAlive();
 
             ctx.pending_promises_for_abort -|= 1;
-            if (ctx.flags.aborted) {
+            if (ctx.isAborted()) {
                 ctx.finalizeForAbort();
                 return JSValue.jsUndefined();
             }
@@ -1551,7 +1551,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
 
             ctx.pending_promises_for_abort -|= 1;
 
-            if (ctx.flags.aborted) {
+            if (ctx.isAborted()) {
                 ctx.finalizeForAbort();
                 return JSValue.jsUndefined();
             }
@@ -1571,7 +1571,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
                     value,
                 );
 
-            if (ctx.flags.aborted) {
+            if (ctx.isAborted()) {
                 ctx.finalizeForAbort();
                 return;
             }
@@ -1771,7 +1771,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
             ctxLog("onWritableResponseBuffer", .{});
 
             assert(this.resp == resp);
-            if (this.flags.aborted) {
+            if (this.isAborted()) {
                 this.finalizeForAbort();
                 return false;
             }
@@ -1785,7 +1785,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
             ctxLog("onWritableCompleteResponseBufferAndMetadata", .{});
             assert(this.resp == resp);
 
-            if (this.flags.aborted) {
+            if (this.isAborted()) {
                 this.finalizeForAbort();
                 return false;
             }
@@ -1806,7 +1806,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
         pub fn onWritableCompleteResponseBuffer(this: *RequestContext, write_offset: u64, resp: *App.Response) callconv(.C) bool {
             ctxLog("onWritableCompleteResponseBuffer", .{});
             assert(this.resp == resp);
-            if (this.flags.aborted) {
+            if (this.isAborted()) {
                 this.finalizeForAbort();
                 return false;
             }
@@ -2086,7 +2086,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
         }};
 
         pub fn onSendfile(this: *RequestContext) bool {
-            if (this.flags.aborted or this.resp == null) {
+            if (this.isAborted() or this.resp == null) {
                 this.cleanupAndFinalizeAfterSendfile();
                 return false;
             }
@@ -2106,7 +2106,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
 
                 this.sendfile.remain -|= @as(Blob.SizeType, @intCast(this.sendfile.offset -| start));
 
-                if (errcode != .SUCCESS or this.flags.aborted or this.sendfile.remain == 0 or val == 0) {
+                if (errcode != .SUCCESS or this.isAborted() or this.sendfile.remain == 0 or val == 0) {
                     if (errcode != .AGAIN and errcode != .SUCCESS and errcode != .PIPE and errcode != .NOTCONN) {
                         Output.prettyErrorln("Error: {s}", .{@tagName(errcode)});
                         Output.flush();
@@ -2128,7 +2128,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
                 const wrote = @as(Blob.SizeType, @intCast(sbytes));
                 this.sendfile.offset +|= wrote;
                 this.sendfile.remain -|= wrote;
-                if (errcode != .AGAIN or this.flags.aborted or this.sendfile.remain == 0 or sbytes == 0) {
+                if (errcode != .AGAIN or this.isAborted() or this.sendfile.remain == 0 or sbytes == 0) {
                     if (errcode != .AGAIN and errcode != .SUCCESS and errcode != .PIPE and errcode != .NOTCONN) {
                         Output.prettyErrorln("Error: {s}", .{@tagName(errcode)});
                         Output.flush();
@@ -2153,7 +2153,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
         pub fn onWritableBytes(this: *RequestContext, write_offset: u64, resp: *App.Response) callconv(.C) bool {
             ctxLog("onWritableBytes", .{});
             assert(this.resp == resp);
-            if (this.flags.aborted) {
+            if (this.isAborted()) {
                 this.finalizeForAbort();
                 return false;
             }
@@ -2287,7 +2287,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
                 .remain = this.blob.Blob.offset + original_size,
                 .offset = this.blob.Blob.offset,
                 .auto_close = auto_close,
-                .socket_fd = if (!this.flags.aborted) resp.getNativeHandle() else bun.invalid_fd,
+                .socket_fd = if (!this.isAborted()) resp.getNativeHandle() else bun.invalid_fd,
             };
 
             // if we are sending only part of a file, include the content-range header
@@ -2321,7 +2321,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
         }
 
         pub fn doSendfile(this: *RequestContext, blob: Blob) void {
-            if (this.flags.aborted) {
+            if (this.isAborted()) {
                 this.finalizeForAbort();
                 return;
             }
@@ -2339,7 +2339,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
         }
 
         pub fn onReadFile(this: *RequestContext, result: Blob.ReadFile.ResultType) void {
-            if (this.flags.aborted or this.resp == null) {
+            if (this.isAborted() or this.resp == null) {
                 this.finalizeForAbort();
                 return;
             }
@@ -2392,7 +2392,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
         }
 
         fn renderWithBlobFromBodyValue(this: *RequestContext) void {
-            if (this.flags.aborted) {
+            if (this.isAborted()) {
                 this.finalizeForAbort();
                 return;
             }
@@ -2419,7 +2419,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
             ctxLog("doRenderStream", .{});
             var this = pair.this;
             var stream = pair.stream;
-            if (this.resp == null or this.flags.aborted) {
+            if (this.resp == null or this.isAborted()) {
                 stream.cancel(this.server.globalThis);
                 this.readable_stream_ref.deinit();
                 this.finalizeForAbort();
@@ -2474,7 +2474,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
 
             if (assignment_result.toError()) |err_value| {
                 streamLog("returned an error", .{});
-                if (!this.flags.aborted) resp.clearAborted();
+                if (!this.isAborted()) resp.clearAborted();
                 response_stream.detach();
                 this.sink = null;
                 response_stream.sink.destroy();
@@ -2482,7 +2482,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
             }
 
             if (resp.hasResponded()) {
-                if (!this.flags.aborted) resp.clearAborted();
+                if (!this.isAborted()) resp.clearAborted();
                 streamLog("done", .{});
                 response_stream.detach();
                 this.sink = null;
@@ -2550,7 +2550,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
                 } else {
                     // if is not a promise we treat it as Error
                     streamLog("returned an error", .{});
-                    if (!this.flags.aborted) resp.clearAborted();
+                    if (!this.isAborted()) resp.clearAborted();
                     response_stream.detach();
                     this.sink = null;
                     response_stream.sink.destroy();
@@ -2558,7 +2558,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
                 }
             }
 
-            if (this.flags.aborted) {
+            if (this.isAborted()) {
                 response_stream.detach();
                 stream.cancel(globalThis);
                 defer this.readable_stream_ref.deinit();
@@ -2632,6 +2632,11 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
             ctx.setAbortHandler();
         }
 
+        fn isAborted(this: *RequestContext) bool {
+            // aborted or server.stop(true)
+            return this.flags.aborted or this.server.flags.terminated;
+        }
+
         // Each HTTP request or TCP socket connection is effectively a "task".
         //
         // However, unlike the regular task queue, we don't drain the microtask
@@ -2656,7 +2661,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
             response_value.ensureStillAlive();
             ctx.drainMicrotasks();
 
-            if (ctx.flags.aborted) {
+            if (ctx.isAborted()) {
                 ctx.finalizeForAbort();
                 return;
             }
@@ -2798,7 +2803,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
 
             streamLog("onResolve({any})", .{wrote_anything});
             //aborted so call finalizeForAbort
-            if (req.flags.aborted or req.resp == null) {
+            if (req.isAborted() or req.resp == null) {
                 req.finalizeForAbort();
                 return;
             }
@@ -2859,7 +2864,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
             }
 
             // aborted so call finalizeForAbort
-            if (req.flags.aborted) {
+            if (req.isAborted()) {
                 req.finalizeForAbort();
                 return;
             }
@@ -2892,7 +2897,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
                 .Error => {
                     const err = value.Error;
                     _ = value.use();
-                    if (this.flags.aborted) {
+                    if (this.isAborted()) {
                         this.finalizeForAbort();
                         return;
                     }
@@ -2910,7 +2915,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
                     return;
                 },
                 .Locked => |*lock| {
-                    if (this.flags.aborted) {
+                    if (this.isAborted()) {
                         this.finalizeForAbort();
                         return;
                     }
@@ -3025,7 +3030,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
                 }
             }
 
-            if (this.flags.aborted or this.resp == null) {
+            if (this.isAborted() or this.resp == null) {
                 this.finalizeForAbort();
                 return;
             }
@@ -3073,7 +3078,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
         pub fn doRender(this: *RequestContext) void {
             ctxLog("doRender", .{});
 
-            if (this.flags.aborted) {
+            if (this.isAborted()) {
                 this.finalizeForAbort();
                 return;
             }
@@ -3430,7 +3435,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
             assert(this.resp == resp);
 
             this.flags.is_waiting_for_request_body = last == false;
-            if (this.flags.aborted or this.flags.has_marked_complete) return;
+            if (this.isAborted() or this.flags.has_marked_complete) return;
             if (!last and chunk.len == 0) {
                 // Sometimes, we get back an empty chunk
                 // We have to ignore those chunks unless it's the last one
@@ -3529,7 +3534,7 @@ fn NewRequestContext(comptime ssl_enabled: bool, comptime debug_mode: bool, comp
 
         pub fn onStartStreamingRequestBody(this: *RequestContext) JSC.WebCore.DrainResult {
             ctxLog("onStartStreamingRequestBody", .{});
-            if (this.flags.aborted) {
+            if (this.isAborted()) {
                 return JSC.WebCore.DrainResult{
                     .aborted = {},
                 };
@@ -5385,7 +5390,7 @@ pub fn NewServer(comptime NamespaceType: type, comptime ssl_enabled_: bool, comp
             }
 
             var upgrader = bun.cast(*RequestContext, request.upgrader.?);
-            if (upgrader.flags.aborted or upgrader.resp == null) {
+            if (upgrader.isAborted() or upgrader.resp == null) {
                 return JSC.jsBoolean(false);
             }
 
